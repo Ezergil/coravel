@@ -1,20 +1,17 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Coravel;
+using Coravel.Scheduling.Schedule.Interfaces;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using TestMvcApp.Models;
+using Microsoft.Extensions.Logging;
 
 namespace TestMvcApp
 {
-    public class Startup
+    public partial class Startup
     {
         public Startup(IConfiguration configuration)
         {
@@ -34,8 +31,10 @@ namespace TestMvcApp
             });
 
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
-
+            services.AddLogging();
             services.AddCache();
+            services.AddScheduler();
+            services.AddTransient<ThrowExceptionInvocable>();
 
             services.AddFileLogMailer(this.Configuration);
         }
@@ -53,6 +52,11 @@ namespace TestMvcApp
                 app.UseHsts();
             }
 
+            app.ApplicationServices.UseScheduler(scheduler =>
+            {
+                scheduler.Schedule(() => throw new InvalidOperationException()).EveryFifteenSeconds();
+                scheduler.Schedule<ThrowExceptionInvocable>().EveryMinute();
+            }).LogScheduledTaskProgress(app.ApplicationServices.GetService<ILogger<IScheduler>>());
             app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseCookiePolicy();
